@@ -49,7 +49,6 @@ public class Unreal5MCP : ModuleRules
                 "SlateCore",
                 "LevelEditor",
                 "DeveloperSettings",
-                "PythonScriptPlugin",
 				// ... add private dependencies that you statically link with here ...	
 			}
         );

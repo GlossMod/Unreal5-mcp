@@ -11,11 +11,6 @@
 #include "EngineUtils.h"
 #include "GameFramework/Actor.h"
 #include "UObject/UObjectGlobals.h"
-#include "IPythonScriptPlugin.h"
-#include "HAL/PlatformFilemanager.h"
-#include "Misc/FileHelper.h"
-#include "Misc/Paths.h"
-#include "Misc/Guid.h"
 
 // ============================================================================
 // 基类实现
@@ -338,52 +333,8 @@ TSharedPtr<FJsonObject> FMCPDeleteObjectHandler::Execute(const TSharedPtr<FJsonO
 }
 
 // ============================================================================
-// 执行 Python 命令处理器
+// 执行 Python 命令处理器 - 已移除,改用直接UE API操作
 // ============================================================================
-
-TSharedPtr<FJsonObject> FMCPExecutePythonHandler::Execute(const TSharedPtr<FJsonObject> &Params, FSocket *ClientSocket)
-{
-    // 获取 Python 代码
-    FString PythonCode;
-    if (!Params->TryGetStringField(TEXT("code"), PythonCode))
-    {
-        return CreateErrorResponse(TEXT("Missing 'code' parameter"));
-    }
-
-    // 获取 Python 插件
-    IPythonScriptPlugin *PythonPlugin = FModuleManager::GetModulePtr<IPythonScriptPlugin>("PythonScriptPlugin");
-    if (!PythonPlugin)
-    {
-        return CreateErrorResponse(TEXT("Python plugin not available"));
-    }
-
-    // 执行 Python 代码
-    FString ResultString;
-    bool bSuccess = false;
-
-    // 创建临时 Python 文件
-    FString TempFileName = FString::Printf(TEXT("%s%s.py"),
-                                           MCPConstants::PYTHON_TEMP_FILE_PREFIX,
-                                           *FGuid::NewGuid().ToString());
-    FString TempFilePath = FPaths::Combine(MCPConstants::PythonTempPath, TempFileName);
-
-    // 写入 Python 代码
-    if (FFileHelper::SaveStringToFile(PythonCode, *TempFilePath))
-    {
-        // 执行 Python 文件
-        bSuccess = PythonPlugin->ExecPythonCommand(*FString::Printf(TEXT("exec(open(r'%s').read())"), *TempFilePath));
-
-        // 删除临时文件
-        IFileManager::Get().Delete(*TempFilePath);
-    }
-    else
-    {
-        return CreateErrorResponse(TEXT("Failed to create temporary Python file"));
-    }
-
-    TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
-    Result->SetBoolField("success", bSuccess);
-    Result->SetStringField("message", bSuccess ? TEXT("Python code executed successfully") : TEXT("Python execution failed"));
-
-    return CreateSuccessResponse(Result);
-}
+// 注意: execute_python 命令已不再支持
+// 所有操作现在通过直接的UE API命令完成(create_object, modify_object等)
+// 这样可以避免Python依赖,提高性能和安全性

@@ -14,10 +14,6 @@ namespace MCPConstants
     constexpr float DEFAULT_CLIENT_TIMEOUT_SECONDS = 30.0f;
     constexpr float DEFAULT_TICK_INTERVAL_SECONDS = 0.1f;
 
-    // Python 常量
-    constexpr const TCHAR *PYTHON_TEMP_DIR_NAME = TEXT("PythonTemp");
-    constexpr const TCHAR *PYTHON_TEMP_FILE_PREFIX = TEXT("mcp_temp_script_");
-
     // 日志常量
     constexpr bool DEFAULT_VERBOSE_LOGGING = false;
 
@@ -29,7 +25,6 @@ namespace MCPConstants
     extern FString PluginRootPath;
     extern FString PluginContentPath;
     extern FString PluginLogsPath;
-    extern FString PythonTempPath;
 
     /**
      * 初始化路径常量

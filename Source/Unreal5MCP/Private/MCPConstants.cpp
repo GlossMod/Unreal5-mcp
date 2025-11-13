@@ -11,7 +11,6 @@ namespace MCPConstants
     FString PluginRootPath;
     FString PluginContentPath;
     FString PluginLogsPath;
-    FString PythonTempPath;
 
     void InitializePathConstants()
     {
@@ -35,18 +34,11 @@ namespace MCPConstants
         // 设置日志路径
         PluginLogsPath = FPaths::Combine(PluginRootPath, TEXT("Logs"));
 
-        // 设置 Python 临时路径
-        PythonTempPath = FPaths::Combine(PluginRootPath, PYTHON_TEMP_DIR_NAME);
-
         // 确保目录存在
         IPlatformFile &PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
         if (!PlatformFile.DirectoryExists(*PluginLogsPath))
         {
             PlatformFile.CreateDirectory(*PluginLogsPath);
-        }
-        if (!PlatformFile.DirectoryExists(*PythonTempPath))
-        {
-            PlatformFile.CreateDirectory(*PythonTempPath);
         }
     }
 }

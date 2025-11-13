@@ -22,7 +22,7 @@ FMCPTCPServer::FMCPTCPServer(const FMCPTCPServerConfig &InConfig)
     RegisterCommandHandler(MakeShared<FMCPCreateObjectHandler>());
     RegisterCommandHandler(MakeShared<FMCPModifyObjectHandler>());
     RegisterCommandHandler(MakeShared<FMCPDeleteObjectHandler>());
-    RegisterCommandHandler(MakeShared<FMCPExecutePythonHandler>());
+    // Python处理器已移除 - 改用直接UE API操作
 }
 
 FMCPTCPServer::~FMCPTCPServer()

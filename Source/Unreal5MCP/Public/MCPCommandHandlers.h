@@ -63,12 +63,8 @@ public:
     virtual TSharedPtr<FJsonObject> Execute(const TSharedPtr<FJsonObject> &Params, FSocket *ClientSocket) override;
 };
 
-/**
- * 执行 Python 命令处理器
- */
-class FMCPExecutePythonHandler : public FMCPCommandHandlerBase
-{
-public:
-    virtual FString GetCommandName() const override { return TEXT("execute_python"); }
-    virtual TSharedPtr<FJsonObject> Execute(const TSharedPtr<FJsonObject> &Params, FSocket *ClientSocket) override;
-};
+// ============================================================================
+// 执行 Python 命令处理器 - 已移除
+// ============================================================================
+// 注意: execute_python 命令已不再支持
+// 所有操作现在通过直接的UE API命令完成
