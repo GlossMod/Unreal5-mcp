@@ -3,6 +3,7 @@
 #include "MCPTCPServer.h"
 #include "MCPCommandHandlers.h"
 #include "MCPConstants.h"
+#include "MCPSettings.h"
 #include "Unreal5MCP.h"
 #include "Engine/World.h"
 #include "Editor.h"
@@ -12,17 +13,52 @@
 #include "Interfaces/IPv4/IPv4Address.h"
 #include "Interfaces/IPv4/IPv4Endpoint.h"
 #include "Containers/Ticker.h"
+#include "Json.h"
 #include "JsonObjectConverter.h"
 
 FMCPTCPServer::FMCPTCPServer(const FMCPTCPServerConfig &InConfig)
     : Config(InConfig), Listener(nullptr), bRunning(false)
 {
-    // 注册默认命令处理器
+    // ============================================================================
+    // 注册基础命令处理器
+    // ============================================================================
     RegisterCommandHandler(MakeShared<FMCPGetSceneInfoHandler>());
     RegisterCommandHandler(MakeShared<FMCPCreateObjectHandler>());
     RegisterCommandHandler(MakeShared<FMCPModifyObjectHandler>());
     RegisterCommandHandler(MakeShared<FMCPDeleteObjectHandler>());
-    // Python处理器已移除 - 改用直接UE API操作
+
+    // ============================================================================
+    // 注册蓝图命令处理器
+    // ============================================================================
+    RegisterCommandHandler(MakeShared<FMCPCreateBlueprintHandler>());
+    RegisterCommandHandler(MakeShared<FMCPGetBlueprintInfoHandler>());
+    RegisterCommandHandler(MakeShared<FMCPModifyBlueprintHandler>());
+    RegisterCommandHandler(MakeShared<FMCPCompileBlueprintHandler>());
+
+    // ============================================================================
+    // 注册场景编辑命令处理器
+    // ============================================================================
+    RegisterCommandHandler(MakeShared<FMCPSetCameraHandler>());
+    RegisterCommandHandler(MakeShared<FMCPGetCameraHandler>());
+    RegisterCommandHandler(MakeShared<FMCPCreateLightHandler>());
+    RegisterCommandHandler(MakeShared<FMCPSelectActorHandler>());
+    RegisterCommandHandler(MakeShared<FMCPGetSelectedActorsHandler>());
+
+    // ============================================================================
+    // 注册资源管理命令处理器
+    // ============================================================================
+    RegisterCommandHandler(MakeShared<FMCPImportAssetHandler>());
+    RegisterCommandHandler(MakeShared<FMCPCreateMaterialHandler>());
+    RegisterCommandHandler(MakeShared<FMCPListAssetsHandler>());
+
+    // ============================================================================
+    // 注册批量操作命令处理器
+    // ============================================================================
+    RegisterCommandHandler(MakeShared<FMCPBatchCreateHandler>());
+    RegisterCommandHandler(MakeShared<FMCPBatchModifyHandler>());
+    RegisterCommandHandler(MakeShared<FMCPBatchDeleteHandler>());
+
+    MCP_LOG_INFO("MCP Server initialized with %d command handlers", CommandHandlers.Num());
 }
 
 FMCPTCPServer::~FMCPTCPServer()
@@ -360,7 +396,34 @@ void FMCPTCPServer::ProcessCommand(const FString &CommandJson, FSocket *ClientSo
                         {
                             MCP_LOG_INFO("Executing tool: %s", *ToolName);
                             TSharedPtr<FJsonObject> ToolResult = (*HandlerPtr)->Execute(ToolArgs ? *ToolArgs : *ParamsObj, ClientSocket);
-                            Response->SetObjectField("result", ToolResult);
+
+                            // 根据 MCP 标准, tools/call 的响应必须包含 content 数组
+                            if (ToolResult.IsValid())
+                            {
+                                TSharedPtr<FJsonObject> ResultWrapper = MakeShared<FJsonObject>();
+
+                                // 创建 content 数组
+                                TArray<TSharedPtr<FJsonValue>> ContentArray;
+                                TSharedPtr<FJsonObject> ContentItem = MakeShared<FJsonObject>();
+                                ContentItem->SetStringField("type", TEXT("text"));
+
+                                // 将工具结果转换为 JSON 字符串
+                                FString ResultStr;
+                                TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&ResultStr);
+                                FJsonSerializer::Serialize(ToolResult.ToSharedRef(), Writer);
+                                ContentItem->SetStringField("text", ResultStr);
+
+                                ContentArray.Add(MakeShared<FJsonValueObject>(ContentItem));
+                                ResultWrapper->SetArrayField("content", ContentArray);
+                                Response->SetObjectField("result", ResultWrapper);
+                            }
+                            else
+                            {
+                                TSharedPtr<FJsonObject> Error = MakeShared<FJsonObject>();
+                                Error->SetNumberField("code", -32603);
+                                Error->SetStringField("message", TEXT("Internal error: Tool returned null result"));
+                                Response->SetObjectField("error", Error);
+                            }
                         }
                         else
                         {
@@ -370,6 +433,20 @@ void FMCPTCPServer::ProcessCommand(const FString &CommandJson, FSocket *ClientSo
                             Response->SetObjectField("error", Error);
                         }
                     }
+                    else
+                    {
+                        TSharedPtr<FJsonObject> Error = MakeShared<FJsonObject>();
+                        Error->SetNumberField("code", -32602);
+                        Error->SetStringField("message", TEXT("Missing 'name' parameter"));
+                        Response->SetObjectField("error", Error);
+                    }
+                }
+                else
+                {
+                    TSharedPtr<FJsonObject> Error = MakeShared<FJsonObject>();
+                    Error->SetNumberField("code", -32602);
+                    Error->SetStringField("message", TEXT("Missing 'params' object"));
+                    Response->SetObjectField("error", Error);
                 }
             }
             else
@@ -540,4 +617,59 @@ FString FMCPTCPServer::GetSafeSocketDescription(FSocket *Socket)
     }
 
     return TEXT("unknown");
+}
+
+// ============================================================================
+// 配置结构实现
+// ============================================================================
+
+FMCPTCPServerConfig FMCPTCPServerConfig::FromSettings(const class UMCPSettings *Settings)
+{
+    FMCPTCPServerConfig Config;
+
+    if (Settings)
+    {
+        Config.Port = Settings->Port;
+        Config.ClientTimeoutSeconds = Settings->ClientTimeoutSeconds;
+        Config.MaxConcurrentClients = Settings->MaxConcurrentClients;
+        Config.bLocalhostOnly = Settings->bLocalhostOnly;
+        Config.bEnableVerboseLogging = Settings->bEnableVerboseLogging;
+        Config.bLogFullJsonMessages = Settings->bLogFullJsonMessages;
+        Config.TickIntervalSeconds = Settings->ServerTickInterval;
+        Config.MaxActorsInSceneInfo = Settings->MaxActorsInSceneInfo;
+        Config.CommandExecutionTimeout = Settings->CommandExecutionTimeout;
+    }
+
+    return Config;
+}
+
+bool FMCPTCPServerConfig::Validate(FString &OutErrorMessage) const
+{
+    // 验证端口
+    if (!MCPConstants::IsValidPort(Port))
+    {
+        OutErrorMessage = FString::Printf(TEXT("Invalid port %d. Must be between %d and %d."),
+                                          Port, MCPConstants::MIN_PORT, MCPConstants::MAX_PORT);
+        return false;
+    }
+
+    // 验证超时
+    if (!MCPConstants::IsValidTimeout(ClientTimeoutSeconds))
+    {
+        OutErrorMessage = FString::Printf(TEXT("Invalid client timeout %.1f. Must be between %.1f and %.1f seconds."),
+                                          ClientTimeoutSeconds, MCPConstants::MIN_CLIENT_TIMEOUT_SECONDS,
+                                          MCPConstants::MAX_CLIENT_TIMEOUT_SECONDS);
+        return false;
+    }
+
+    // 验证最大客户端数
+    if (MaxConcurrentClients < 1 || MaxConcurrentClients > 50)
+    {
+        OutErrorMessage = FString::Printf(TEXT("Invalid max concurrent clients %d. Must be between 1 and 50."),
+                                          MaxConcurrentClients);
+        return false;
+    }
+
+    OutErrorMessage.Empty();
+    return true;
 }

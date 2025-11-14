@@ -1,19 +1,21 @@
 {
 	"FileVersion": 3,
-	"Version": 1,
-	"VersionName": "1.0",
-	"FriendlyName": "Unreal5 MCP",
-	"Description": "Model Context Protocol (MCP) server integration for Unreal Engine 5, allowing AI tools to control and interact with Unreal Engine programmatically.",
-	"Category": "AI",
+	"Version": 2,
+	"VersionName": "2.0.0",
+	"FriendlyName": "Unreal5 MCP Server",
+	"Description": "Model Context Protocol (MCP) server implementation for Unreal Engine 5. Enables AI tools like Claude to programmatically control and interact with UE5 through a JSON-RPC API over HTTP/TCP. Features include scene manipulation, actor management, property modification, and extensible command system.",
+	"Category": "AI Integration",
 	"CreatedBy": "3DMXM",
 	"CreatedByURL": "https://github.com/3DMXM/Galaxy-Simulator",
-	"DocsURL": "",
+	"DocsURL": "https://github.com/3DMXM/Galaxy-Simulator/blob/master/Plugins/unreal5-mcp/README.md",
 	"MarketplaceURL": "",
-	"SupportURL": "",
+	"SupportURL": "https://github.com/3DMXM/Galaxy-Simulator/issues",
+	"EngineVersion": "5.7.0",
 	"CanContainContent": true,
 	"IsBetaVersion": false,
 	"IsExperimentalVersion": false,
 	"Installed": false,
+	"EnabledByDefault": false,
 	"Modules": [
 		{
 			"Name": "Unreal5MCP",
@@ -23,13 +25,11 @@
 				"Win64",
 				"Mac",
 				"Linux"
+			],
+			"TargetAllowList": [
+				"Editor"
 			]
 		}
 	],
-	"Plugins": [
-		{
-			"Name": "PythonScriptPlugin",
-			"Enabled": true
-		}
-	]
+	"Plugins": []
 }

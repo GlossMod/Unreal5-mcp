@@ -10,24 +10,54 @@
 #include "MCPConstants.h"
 
 /**
- * TCP 服务器配置结构
+ * FMCPTCPServerConfig - TCP 服务器配置结构
+ *
+ * 包含启动和运行MCP服务器所需的所有配置参数
  */
 struct FMCPTCPServerConfig
 {
     /** 监听端口 */
     int32 Port = MCPConstants::DEFAULT_PORT;
 
-    /** 客户端超时时间（秒） */
+    /** 客户端超时时间（秒） - 无活动后断开连接 */
     float ClientTimeoutSeconds = MCPConstants::DEFAULT_CLIENT_TIMEOUT_SECONDS;
 
     /** 接收缓冲区大小（字节） */
     int32 ReceiveBufferSize = MCPConstants::DEFAULT_RECEIVE_BUFFER_SIZE;
 
-    /** Tick 间隔（秒） */
+    /** 发送缓冲区大小（字节） */
+    int32 SendBufferSize = MCPConstants::DEFAULT_SEND_BUFFER_SIZE;
+
+    /** Tick 间隔（秒） - 处理连接的频率 */
     float TickIntervalSeconds = MCPConstants::DEFAULT_TICK_INTERVAL_SECONDS;
+
+    /** 最大并发客户端数量 */
+    int32 MaxConcurrentClients = MCPConstants::MAX_CONCURRENT_CLIENTS;
 
     /** 是否启用详细日志 */
     bool bEnableVerboseLogging = MCPConstants::DEFAULT_VERBOSE_LOGGING;
+
+    /** 是否记录完整JSON消息 */
+    bool bLogFullJsonMessages = MCPConstants::LOG_FULL_JSON_MESSAGES;
+
+    /** 是否只允许本地连接 */
+    bool bLocalhostOnly = MCPConstants::LOCALHOST_ONLY;
+
+    /** 命令执行超时时间（秒） */
+    float CommandExecutionTimeout = MCPConstants::MAX_COMMAND_EXECUTION_TIME;
+
+    /** 场景信息最大Actor数量 */
+    int32 MaxActorsInSceneInfo = MCPConstants::MAX_ACTORS_IN_SCENE_INFO;
+
+    /**
+     * 从设置对象创建配置
+     */
+    static FMCPTCPServerConfig FromSettings(const class UMCPSettings *Settings);
+
+    /**
+     * 验证配置是否有效
+     */
+    bool Validate(FString &OutErrorMessage) const;
 };
 
 /**
