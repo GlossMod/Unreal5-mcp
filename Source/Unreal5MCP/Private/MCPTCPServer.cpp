@@ -363,15 +363,329 @@ void FMCPTCPServer::ProcessCommand(const FString &CommandJson, FSocket *ClientSo
                 TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
                 TArray<TSharedPtr<FJsonValue>> Tools;
 
+                // 定义每个工具的详细 schema
+                TMap<FString, TFunction<TSharedPtr<FJsonObject>()>> SchemaGenerators;
+
+                // batch_create schema
+                SchemaGenerators.Add(TEXT("batch_create"), []() -> TSharedPtr<FJsonObject>
+                                     {
+                    TSharedPtr<FJsonObject> Schema = MakeShared<FJsonObject>();
+                    Schema->SetStringField("type", TEXT("object"));
+                    
+                    TSharedPtr<FJsonObject> Props = MakeShared<FJsonObject>();
+                    
+                    // actors 数组
+                    TSharedPtr<FJsonObject> ActorsSchema = MakeShared<FJsonObject>();
+                    ActorsSchema->SetStringField("type", TEXT("array"));
+                    ActorsSchema->SetStringField("description", TEXT("Array of actors to create"));
+                    
+                    TSharedPtr<FJsonObject> ActorItemSchema = MakeShared<FJsonObject>();
+                    ActorItemSchema->SetStringField("type", TEXT("object"));
+                    
+                    TSharedPtr<FJsonObject> ActorProps = MakeShared<FJsonObject>();
+                    
+                    // class_name
+                    TSharedPtr<FJsonObject> ClassNameSchema = MakeShared<FJsonObject>();
+                    ClassNameSchema->SetStringField("type", TEXT("string"));
+                    ClassNameSchema->SetStringField("description", TEXT("Full UE class name (e.g., 'ASkyAtmosphere', 'ASkyLight', 'AStaticMeshActor')"));
+                    ActorProps->SetObjectField("class_name", ClassNameSchema);
+                    
+                    // name
+                    TSharedPtr<FJsonObject> NameSchema = MakeShared<FJsonObject>();
+                    NameSchema->SetStringField("type", TEXT("string"));
+                    NameSchema->SetStringField("description", TEXT("Actor name"));
+                    ActorProps->SetObjectField("name", NameSchema);
+                    
+                    // location
+                    TSharedPtr<FJsonObject> LocationSchema = MakeShared<FJsonObject>();
+                    LocationSchema->SetStringField("type", TEXT("object"));
+                    LocationSchema->SetStringField("description", TEXT("Actor location as {x, y, z}"));
+                    TSharedPtr<FJsonObject> LocationProps = MakeShared<FJsonObject>();
+                    TSharedPtr<FJsonObject> XSchema = MakeShared<FJsonObject>();
+                    XSchema->SetStringField("type", TEXT("number"));
+                    LocationProps->SetObjectField("x", XSchema);
+                    TSharedPtr<FJsonObject> YSchema = MakeShared<FJsonObject>();
+                    YSchema->SetStringField("type", TEXT("number"));
+                    LocationProps->SetObjectField("y", YSchema);
+                    TSharedPtr<FJsonObject> ZSchema = MakeShared<FJsonObject>();
+                    ZSchema->SetStringField("type", TEXT("number"));
+                    LocationProps->SetObjectField("z", ZSchema);
+                    LocationSchema->SetObjectField("properties", LocationProps);
+                    ActorProps->SetObjectField("location", LocationSchema);
+                    
+                    // rotation (optional)
+                    TSharedPtr<FJsonObject> RotationSchema = MakeShared<FJsonObject>();
+                    RotationSchema->SetStringField("type", TEXT("object"));
+                    RotationSchema->SetStringField("description", TEXT("Actor rotation as {pitch, yaw, roll} (optional)"));
+                    ActorProps->SetObjectField("rotation", RotationSchema);
+                    
+                    // scale (optional)
+                    TSharedPtr<FJsonObject> ScaleSchema = MakeShared<FJsonObject>();
+                    ScaleSchema->SetStringField("type", TEXT("object"));
+                    ScaleSchema->SetStringField("description", TEXT("Actor scale as {x, y, z} (optional)"));
+                    ActorProps->SetObjectField("scale", ScaleSchema);
+                    
+                    ActorItemSchema->SetObjectField("properties", ActorProps);
+                    
+                    TArray<TSharedPtr<FJsonValue>> RequiredFields;
+                    RequiredFields.Add(MakeShared<FJsonValueString>(TEXT("class_name")));
+                    ActorItemSchema->SetArrayField("required", RequiredFields);
+                    
+                    ActorsSchema->SetObjectField("items", ActorItemSchema);
+                    Props->SetObjectField("actors", ActorsSchema);
+                    
+                    Schema->SetObjectField("properties", Props);
+                    
+                    TArray<TSharedPtr<FJsonValue>> RequiredTop;
+                    RequiredTop.Add(MakeShared<FJsonValueString>(TEXT("actors")));
+                    Schema->SetArrayField("required", RequiredTop);
+                    
+                    return Schema; });
+
+                // create_object schema
+                SchemaGenerators.Add(TEXT("create_object"), []() -> TSharedPtr<FJsonObject>
+                                     {
+                    TSharedPtr<FJsonObject> Schema = MakeShared<FJsonObject>();
+                    Schema->SetStringField("type", TEXT("object"));
+                    
+                    TSharedPtr<FJsonObject> Props = MakeShared<FJsonObject>();
+                    
+                    TSharedPtr<FJsonObject> ClassNameSchema = MakeShared<FJsonObject>();
+                    ClassNameSchema->SetStringField("type", TEXT("string"));
+                    ClassNameSchema->SetStringField("description", TEXT("Full UE class name (e.g., 'ASkyAtmosphere', 'AStaticMeshActor')"));
+                    Props->SetObjectField("class_name", ClassNameSchema);
+                    
+                    TSharedPtr<FJsonObject> NameSchema = MakeShared<FJsonObject>();
+                    NameSchema->SetStringField("type", TEXT("string"));
+                    NameSchema->SetStringField("description", TEXT("Actor name (optional)"));
+                    Props->SetObjectField("name", NameSchema);
+                    
+                    TSharedPtr<FJsonObject> LocationSchema = MakeShared<FJsonObject>();
+                    LocationSchema->SetStringField("type", TEXT("object"));
+                    LocationSchema->SetStringField("description", TEXT("Location as {x, y, z} (optional)"));
+                    Props->SetObjectField("location", LocationSchema);
+                    
+                    TSharedPtr<FJsonObject> RotationSchema = MakeShared<FJsonObject>();
+                    RotationSchema->SetStringField("type", TEXT("object"));
+                    RotationSchema->SetStringField("description", TEXT("Rotation as {pitch, yaw, roll} (optional)"));
+                    Props->SetObjectField("rotation", RotationSchema);
+                    
+                    TSharedPtr<FJsonObject> ScaleSchema = MakeShared<FJsonObject>();
+                    ScaleSchema->SetStringField("type", TEXT("object"));
+                    ScaleSchema->SetStringField("description", TEXT("Scale as {x, y, z} (optional)"));
+                    Props->SetObjectField("scale", ScaleSchema);
+                    
+                    TSharedPtr<FJsonObject> AssetPathSchema = MakeShared<FJsonObject>();
+                    AssetPathSchema->SetStringField("type", TEXT("string"));
+                    AssetPathSchema->SetStringField("description", TEXT("Asset path for StaticMeshActor (optional)"));
+                    Props->SetObjectField("asset_path", AssetPathSchema);
+                    
+                    Schema->SetObjectField("properties", Props);
+                    
+                    TArray<TSharedPtr<FJsonValue>> Required;
+                    Required.Add(MakeShared<FJsonValueString>(TEXT("class_name")));
+                    Schema->SetArrayField("required", Required);
+                    
+                    return Schema; });
+
+                // create_blueprint schema
+                SchemaGenerators.Add(TEXT("create_blueprint"), []() -> TSharedPtr<FJsonObject>
+                                     {
+                    TSharedPtr<FJsonObject> Schema = MakeShared<FJsonObject>();
+                    Schema->SetStringField("type", TEXT("object"));
+                    
+                    TSharedPtr<FJsonObject> Props = MakeShared<FJsonObject>();
+                    
+                    TSharedPtr<FJsonObject> PathSchema = MakeShared<FJsonObject>();
+                    PathSchema->SetStringField("type", TEXT("string"));
+                    PathSchema->SetStringField("description", TEXT("Blueprint package path (e.g., '/Game/Blueprints/BP_MyActor')"));
+                    Props->SetObjectField("path", PathSchema);
+                    
+                    TSharedPtr<FJsonObject> NameSchema = MakeShared<FJsonObject>();
+                    NameSchema->SetStringField("type", TEXT("string"));
+                    NameSchema->SetStringField("description", TEXT("Blueprint name (optional, extracted from path if not provided)"));
+                    Props->SetObjectField("name", NameSchema);
+                    
+                    TSharedPtr<FJsonObject> ParentClassSchema = MakeShared<FJsonObject>();
+                    ParentClassSchema->SetStringField("type", TEXT("string"));
+                    ParentClassSchema->SetStringField("description", TEXT("Parent class name (e.g., 'Actor', 'Character', 'Pawn'). Default: 'Character'"));
+                    Props->SetObjectField("parent_class", ParentClassSchema);
+                    
+                    Schema->SetObjectField("properties", Props);
+                    
+                    TArray<TSharedPtr<FJsonValue>> Required;
+                    Required.Add(MakeShared<FJsonValueString>(TEXT("path")));
+                    Schema->SetArrayField("required", Required);
+                    
+                    return Schema; });
+
+                // get_blueprint_info schema
+                SchemaGenerators.Add(TEXT("get_blueprint_info"), []() -> TSharedPtr<FJsonObject>
+                                     {
+                    TSharedPtr<FJsonObject> Schema = MakeShared<FJsonObject>();
+                    Schema->SetStringField("type", TEXT("object"));
+                    
+                    TSharedPtr<FJsonObject> Props = MakeShared<FJsonObject>();
+                    
+                    TSharedPtr<FJsonObject> PathSchema = MakeShared<FJsonObject>();
+                    PathSchema->SetStringField("type", TEXT("string"));
+                    PathSchema->SetStringField("description", TEXT("Blueprint asset path"));
+                    Props->SetObjectField("path", PathSchema);
+                    
+                    Schema->SetObjectField("properties", Props);
+                    
+                    TArray<TSharedPtr<FJsonValue>> Required;
+                    Required.Add(MakeShared<FJsonValueString>(TEXT("path")));
+                    Schema->SetArrayField("required", Required);
+                    
+                    return Schema; });
+
+                // modify_blueprint schema
+                SchemaGenerators.Add(TEXT("modify_blueprint"), []() -> TSharedPtr<FJsonObject>
+                                     {
+                    TSharedPtr<FJsonObject> Schema = MakeShared<FJsonObject>();
+                    Schema->SetStringField("type", TEXT("object"));
+                    
+                    TSharedPtr<FJsonObject> Props = MakeShared<FJsonObject>();
+                    
+                    TSharedPtr<FJsonObject> PathSchema = MakeShared<FJsonObject>();
+                    PathSchema->SetStringField("type", TEXT("string"));
+                    PathSchema->SetStringField("description", TEXT("Blueprint asset path"));
+                    Props->SetObjectField("path", PathSchema);
+                    
+                    TSharedPtr<FJsonObject> DescSchema = MakeShared<FJsonObject>();
+                    DescSchema->SetStringField("type", TEXT("string"));
+                    DescSchema->SetStringField("description", TEXT("Blueprint description (optional)"));
+                    Props->SetObjectField("description", DescSchema);
+                    
+                    Schema->SetObjectField("properties", Props);
+                    
+                    TArray<TSharedPtr<FJsonValue>> Required;
+                    Required.Add(MakeShared<FJsonValueString>(TEXT("path")));
+                    Schema->SetArrayField("required", Required);
+                    
+                    return Schema; });
+
+                // compile_blueprint schema
+                SchemaGenerators.Add(TEXT("compile_blueprint"), []() -> TSharedPtr<FJsonObject>
+                                     {
+                    TSharedPtr<FJsonObject> Schema = MakeShared<FJsonObject>();
+                    Schema->SetStringField("type", TEXT("object"));
+                    
+                    TSharedPtr<FJsonObject> Props = MakeShared<FJsonObject>();
+                    
+                    TSharedPtr<FJsonObject> PathSchema = MakeShared<FJsonObject>();
+                    PathSchema->SetStringField("type", TEXT("string"));
+                    PathSchema->SetStringField("description", TEXT("Blueprint asset path"));
+                    Props->SetObjectField("path", PathSchema);
+                    
+                    Schema->SetObjectField("properties", Props);
+                    
+                    TArray<TSharedPtr<FJsonValue>> Required;
+                    Required.Add(MakeShared<FJsonValueString>(TEXT("path")));
+                    Schema->SetArrayField("required", Required);
+                    
+                    return Schema; });
+
+                // 为每个命令生成工具定义
                 for (const auto &Pair : CommandHandlers)
                 {
                     TSharedPtr<FJsonObject> Tool = MakeShared<FJsonObject>();
                     Tool->SetStringField("name", Pair.Key);
-                    Tool->SetStringField("description", FString::Printf(TEXT("Execute %s command"), *Pair.Key));
 
-                    TSharedPtr<FJsonObject> InputSchema = MakeShared<FJsonObject>();
-                    InputSchema->SetStringField("type", TEXT("object"));
-                    Tool->SetObjectField("inputSchema", InputSchema);
+                    // 为已知命令提供详细描述
+                    if (Pair.Key == TEXT("batch_create"))
+                    {
+                        Tool->SetStringField("description", TEXT("Batch create multiple actors in the scene. Requires 'actors' array with each actor having 'class_name' (required), 'name', 'location' ({x,y,z}), 'rotation' ({pitch,yaw,roll}), and 'scale' ({x,y,z})."));
+                    }
+                    else if (Pair.Key == TEXT("create_object"))
+                    {
+                        Tool->SetStringField("description", TEXT("Create a single actor in the scene. Requires 'class_name' (e.g., 'ASkyAtmosphere', 'ASkyLight', 'AStaticMeshActor'). Optional: 'name', 'location' ({x,y,z}), 'rotation' ({pitch,yaw,roll}), 'scale' ({x,y,z}), 'asset_path'."));
+                    }
+                    else if (Pair.Key == TEXT("modify_object"))
+                    {
+                        Tool->SetStringField("description", TEXT("Modify an existing actor. Requires 'actor_name'. Can update 'location' ({x,y,z}), 'rotation' ({pitch,yaw,roll}), 'scale' ({x,y,z}), and other properties."));
+                    }
+                    else if (Pair.Key == TEXT("batch_modify"))
+                    {
+                        Tool->SetStringField("description", TEXT("Batch modify multiple actors. Requires 'actors' array with each containing 'name' and properties to modify."));
+                    }
+                    else if (Pair.Key == TEXT("batch_delete"))
+                    {
+                        Tool->SetStringField("description", TEXT("Batch delete multiple actors. Requires 'actor_names' array of actor names to delete."));
+                    }
+                    else if (Pair.Key == TEXT("create_blueprint"))
+                    {
+                        Tool->SetStringField("description", TEXT("Create a new Blueprint class. Requires 'path' (package path). Optional: 'name', 'parent_class' (default: 'Character'). Note: Does not support 'components' parameter - components must be added after creation."));
+                    }
+                    else if (Pair.Key == TEXT("get_blueprint_info"))
+                    {
+                        Tool->SetStringField("description", TEXT("Get information about a Blueprint. Requires 'path' (asset path)."));
+                    }
+                    else if (Pair.Key == TEXT("modify_blueprint"))
+                    {
+                        Tool->SetStringField("description", TEXT("Modify a Blueprint. Requires 'path'. Optional: 'description'."));
+                    }
+                    else if (Pair.Key == TEXT("compile_blueprint"))
+                    {
+                        Tool->SetStringField("description", TEXT("Compile a Blueprint. Requires 'path' (asset path)."));
+                    }
+                    else if (Pair.Key == TEXT("get_scene_info"))
+                    {
+                        Tool->SetStringField("description", TEXT("Get information about all actors in the current scene."));
+                    }
+                    else if (Pair.Key == TEXT("delete_object"))
+                    {
+                        Tool->SetStringField("description", TEXT("Delete an actor from the scene. Requires 'actor_name'."));
+                    }
+                    else if (Pair.Key == TEXT("create_light"))
+                    {
+                        Tool->SetStringField("description", TEXT("Create a light actor. Specify light type and properties."));
+                    }
+                    else if (Pair.Key == TEXT("create_material"))
+                    {
+                        Tool->SetStringField("description", TEXT("Create a material asset."));
+                    }
+                    else if (Pair.Key == TEXT("import_asset"))
+                    {
+                        Tool->SetStringField("description", TEXT("Import an external asset file."));
+                    }
+                    else if (Pair.Key == TEXT("list_assets"))
+                    {
+                        Tool->SetStringField("description", TEXT("List assets in a directory."));
+                    }
+                    else if (Pair.Key == TEXT("set_camera"))
+                    {
+                        Tool->SetStringField("description", TEXT("Set editor camera position and rotation."));
+                    }
+                    else if (Pair.Key == TEXT("get_camera"))
+                    {
+                        Tool->SetStringField("description", TEXT("Get current editor camera position and rotation."));
+                    }
+                    else if (Pair.Key == TEXT("select_actor"))
+                    {
+                        Tool->SetStringField("description", TEXT("Select an actor in the editor."));
+                    }
+                    else if (Pair.Key == TEXT("get_selected_actors"))
+                    {
+                        Tool->SetStringField("description", TEXT("Get list of currently selected actors."));
+                    }
+                    else
+                    {
+                        Tool->SetStringField("description", FString::Printf(TEXT("Execute %s command"), *Pair.Key));
+                    }
+
+                    // 使用详细的 schema 或默认 schema
+                    if (auto SchemaGen = SchemaGenerators.Find(Pair.Key))
+                    {
+                        Tool->SetObjectField("inputSchema", (*SchemaGen)());
+                    }
+                    else
+                    {
+                        TSharedPtr<FJsonObject> InputSchema = MakeShared<FJsonObject>();
+                        InputSchema->SetStringField("type", TEXT("object"));
+                        Tool->SetObjectField("inputSchema", InputSchema);
+                    }
 
                     Tools.Add(MakeShared<FJsonValueObject>(Tool));
                 }
